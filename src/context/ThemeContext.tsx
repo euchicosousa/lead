@@ -35,10 +35,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     localStorage.setItem('theme_mode', themeMode)
+    const faviconLink = document.getElementById('favicon') as HTMLLinkElement | null
     if (effectiveTheme === 'dark') {
       document.documentElement.classList.add('dark')
+      if (faviconLink) faviconLink.href = '/ico-white.png'
     } else {
       document.documentElement.classList.remove('dark')
+      if (faviconLink) faviconLink.href = '/ico-black.png'
     }
   }, [themeMode, effectiveTheme])
 

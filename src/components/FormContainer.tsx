@@ -25,9 +25,9 @@ export const FormContainer: React.FC = () => {
   const currentRawValue = currentAnswerObj?.rawValue;
 
   const getThemeLabel = () => {
-    if (theme === "system") return "💻 SYSTEM";
-    if (theme === "dark") return "🌙 DARK";
-    return "☀ LIGHT";
+    if (theme === "system") return "SYSTEM";
+    if (theme === "dark") return "DARK";
+    return "LIGHT";
   };
 
   return (
@@ -57,7 +57,7 @@ export const FormContainer: React.FC = () => {
             {/* Botão de Alternar Tema (Light / Dark / System) */}
             <button
               onClick={toggleTheme}
-              className="text-xs font-mono uppercase tracking-widest text-secondary hover:text-foreground px-3 py-2 transition-all cursor-pointer flex items-center gap-2 bg-background border border-border-custom"
+              className="text-xs font-mono uppercase tracking-widest text-secondary hover:text-foreground px-3 py-2 transition-all cursor-pointer flex items-center gap-2 bg-background"
               title="Alternar modo de tema (Light / Dark / System)"
             >
               <span>{getThemeLabel()}</span>
