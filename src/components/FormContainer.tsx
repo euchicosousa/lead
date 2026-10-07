@@ -9,6 +9,8 @@ import { QuestionFinish } from "./QuestionFinish";
 
 export const FormContainer: React.FC = () => {
   const {
+    isSubmitting,
+    saveError,
     currentQuestion,
     currentId,
     answersMap,
@@ -65,6 +67,7 @@ export const FormContainer: React.FC = () => {
 
             {canGoBack && (
               <button
+                disabled={isSubmitting}
                 onClick={handleBack}
                 className="text-xs font-mono uppercase tracking-widest text-secondary hover:text-foreground border border-border-custom px-4 py-2 transition-all cursor-pointer bg-background"
               >
@@ -76,6 +79,9 @@ export const FormContainer: React.FC = () => {
 
         {/* Área Central de Conteúdo */}
         <main className="w-full my-auto flex flex-col items-start justify-center py-12">
+          {saveError && <p role="alert" className="mb-6 w-full border border-border-custom p-4 text-foreground">{saveError}</p>}
+          {isSubmitting && <p role="status" className="mb-4 text-secondary">Salvando respostas…</p>}
+          <fieldset disabled={isSubmitting} aria-busy={isSubmitting} className="w-full min-w-0 disabled:opacity-60">
           {currentId === "initial_block" ? (
             <InitialBlock onComplete={handleInitialBlockComplete} />
           ) : currentQuestion.type === "text" ||
@@ -83,21 +89,21 @@ export const FormContainer: React.FC = () => {
             <QuestionText
               key={currentQuestion.id}
               question={currentQuestion}
-              defaultValue={currentRawValue || ""}
+              defaultValue={typeof currentRawValue === "string" ? currentRawValue : ""}
               onNext={handleNext}
             />
           ) : currentQuestion.type === "single" ? (
             <QuestionSingle
               key={currentQuestion.id}
               question={currentQuestion}
-              selectedValue={currentRawValue}
+              selectedValue={typeof currentRawValue === "string" ? currentRawValue : undefined}
               onNext={handleNext}
             />
           ) : currentQuestion.type === "multi" ? (
             <QuestionMulti
               key={currentQuestion.id}
               question={currentQuestion}
-              defaultSelected={currentRawValue || []}
+              defaultSelected={Array.isArray(currentRawValue) ? currentRawValue : []}
               onNext={handleNext}
             />
           ) : currentQuestion.type === "finish" ? (
@@ -106,6 +112,7 @@ export const FormContainer: React.FC = () => {
               question={currentQuestion}
             />
           ) : null}
+          </fieldset>
         </main>
 
         {/* Rodapé no Estilo Suíço de Metadados */}

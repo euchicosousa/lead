@@ -1,13 +1,16 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import { formQuestions } from '../lib/perguntas'
 import { createLead, updateLead, type AnswerItem } from '../lib/leads'
 
 export function useFormFlow() {
   const [currentId, setCurrentId] = useState<string>('initial_block')
   const [history, setHistory] = useState<string[]>([])
-  const [answersMap, setAnswersMap] = useState<Map<string, { question: string; answer: string; rawValue: any }>>(new Map())
+  const [answersMap, setAnswersMap] = useState<Map<string, { question: string; answer: string; rawValue: string | string[] }>>(new Map())
   const [leadId, setLeadId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const savingRef = useRef(false)
 
   // Cálculo da barra de progresso ponderada
   const progressPercentage = useMemo(() => {
@@ -41,11 +44,13 @@ export function useFormFlow() {
   // Manipular a conclusão das 3 primeiras perguntas de uma vez
   const handleInitialBlockComplete = useCallback(
     async (data: { name: string; whatsapp: string; mainNeed: string; nextId: string }) => {
-      if (isSubmitting) return
+      if (savingRef.current) return
+      savingRef.current = true
       setIsSubmitting(true)
+      setSaveError(null)
 
       const mainNeedQuestion = formQuestions.find((q) => q.id === 'main_need')
-      const mainNeedLabel = mainNeedQuestion?.options?.find((o: any) => o.value === data.mainNeed)?.label || data.mainNeed
+      const mainNeedLabel = mainNeedQuestion?.options?.find((o) => o.value === data.mainNeed)?.label || data.mainNeed
 
       const newMap = new Map(answersMap)
       newMap.set('name', { question: 'Como podemos chamar você?', answer: data.name, rawValue: data.name })
@@ -57,35 +62,28 @@ export function useFormFlow() {
       })
       setAnswersMap(newMap)
 
-      // Criar lead no Supabase imediatamente
-      const createdId = await createLead(data.name, data.whatsapp)
-      if (createdId) {
-        setLeadId(createdId)
-
-        // Atualizar com a resposta da main_need e answers inicial
-        const formattedAnswers: AnswerItem[] = [
-          {
-            question: 'O que você está procurando para sua empresa neste momento?',
-            answer: mainNeedLabel,
-          },
-        ]
-
-        await updateLead(createdId, {
+      try {
+        const initial = {
           main_need: data.mainNeed,
-          answers: formattedAnswers,
-        })
+          answers: [{question: 'O que você está procurando para sua empresa neste momento?', answer: mainNeedLabel}],
+        }
+        if (leadId) await updateLead(leadId, {name: data.name, whatsapp: data.whatsapp, ...initial})
+        else setLeadId(await createLead(data.name, data.whatsapp, initial))
+        setHistory((prev) => [...prev, 'initial_block'])
+        setCurrentId(data.nextId)
+      } catch (error) {
+        setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar. Tente novamente.')
+      } finally {
+        savingRef.current = false
+        setIsSubmitting(false)
       }
-
-      setIsSubmitting(false)
-      setHistory((prev) => [...prev, 'initial_block'])
-      setCurrentId(data.nextId)
     },
-    [answersMap, isSubmitting]
+    [answersMap, leadId]
   )
 
   const handleNext = useCallback(
-    async (value: any, displayAnswer?: string, explicitNextId?: string) => {
-      if (isSubmitting) return
+    async (value: string | string[], displayAnswer?: string, explicitNextId?: string) => {
+      if (savingRef.current) return
 
       const questionObj = formQuestions.find((q) => q.id === currentId)
       if (!questionObj) return
@@ -94,42 +92,46 @@ export function useFormFlow() {
 
       const newAnswersMap = new Map(answersMap)
       newAnswersMap.set(currentId, {
-        question: questionObj.question || (questionObj as any).title || '',
+        question: questionObj.question || '',
         answer: answerText,
         rawValue: value,
       })
       setAnswersMap(newAnswersMap)
 
-      if (leadId) {
-        const formattedAnswers: AnswerItem[] = Array.from(newAnswersMap.entries())
-          .filter(([qId]) => qId !== 'name' && qId !== 'whatsapp')
-          .map(([, d]) => ({
-            question: d.question,
-            answer: d.answer,
-          }))
-
-        const nextIsFinish = explicitNextId === 'finish' || questionObj.next === 'finish'
-
-        updateLead(leadId, {
-          answers: formattedAnswers,
-          ...(nextIsFinish ? { completed: true } : {}),
-        })
+      if (!leadId) {
+        setSaveError('Reinicie o formulário para confirmar seus dados de contato.')
+        return
       }
-
-      let nextQuestionId = explicitNextId || questionObj.next
-
-      if (nextQuestionId) {
+      const nextQuestionId = explicitNextId || questionObj.next
+      if (!nextQuestionId) return
+      savingRef.current = true
+      setIsSubmitting(true)
+      setSaveError(null)
+      try {
+        const formattedAnswers: AnswerItem[] = Array.from(newAnswersMap.entries())
+          .filter(([id]) => id !== 'name' && id !== 'whatsapp')
+          .map(([, data]) => ({question: data.question, answer: data.answer}))
+        await updateLead(leadId, {
+          answers: formattedAnswers,
+          ...(nextQuestionId === 'finish' ? {completed: true} : {}),
+        })
         setHistory((prev) => [...prev, currentId])
         setCurrentId(nextQuestionId)
+      } catch (error) {
+        setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar. Tente novamente.')
+      } finally {
+        savingRef.current = false
+        setIsSubmitting(false)
       }
     },
-    [currentId, answersMap, leadId, isSubmitting]
+    [currentId, answersMap, leadId]
   )
 
   const handleBack = useCallback(() => {
-    if (history.length === 0) return
+    if (savingRef.current || history.length === 0) return
     const prevHistory = [...history]
-    const lastId = prevHistory.pop()!
+    const lastId = prevHistory.pop()
+    if (!lastId) return
     setHistory(prevHistory)
     setCurrentId(lastId)
   }, [history])
@@ -146,6 +148,8 @@ export function useFormFlow() {
     answersMap,
     history,
     leadId,
+    isSubmitting,
+    saveError,
     progressPercentage,
     handleInitialBlockComplete,
     handleNext,

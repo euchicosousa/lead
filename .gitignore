@@ -11,3 +11,6 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+
+# All environment files are private; no env file is versioned.
+.env*
