@@ -15,6 +15,15 @@ before(async () => {
 	globalThis.fetch = async (url, opts) => {
 		const u = new URL(url);
 		if (u.hostname !== "example.supabase.co") return originalFetch(url, opts);
+		if (
+			opts.headers.apikey.startsWith("sb_secret_") &&
+			opts.headers.Authorization
+		) {
+			return Response.json(
+				{ message: "A secret key is not a user JWT" },
+				{ status: 401 },
+			);
+		}
 		if (opts.method === "POST") {
 			const id = crypto.randomUUID();
 			rows.set(id, JSON.parse(opts.body));
@@ -163,5 +172,20 @@ test("expired cookie is rejected and HTTPS cookie carries Secure", async () => {
 		assert.match(secure.headers.get("set-cookie"), /; Secure/);
 	} finally {
 		process.env.LEADS_ORIGIN = "http://localhost:3000";
+	}
+});
+
+test("server accepts a modern secret key without presenting it as a user JWT", async () => {
+	const previous = process.env.SUPABASE_SERVICE_ROLE_KEY;
+	process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_disposable_test_key";
+	try {
+		const response = await send("POST", {
+			name: "Teste moderno",
+			whatsapp: "85999999999",
+		});
+		assert.equal(response.status, 201);
+		assert.match(response.headers.get("set-cookie"), /HttpOnly/);
+	} finally {
+		process.env.SUPABASE_SERVICE_ROLE_KEY = previous;
 	}
 });

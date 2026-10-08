@@ -15,3 +15,7 @@ Primeiro publicar/testar este formulário/API, depois fechar permissões da tabe
 Não há retomada após reload/entre dispositivos. Cookie24h autoriza um formulário ativo por navegador. Sem revogação individual ou idempotência da criação; resposta de POST perdida pode deixar registro incompleto/duplicado no retry. Origin não bloqueia bots: revisar proteção de abuso/WAF na publicação. Não anunciar produção protegida enquanto a versão antiga continuar publicada.
 
 Relatório completo: `/Users/euchicosousa/vercel/uzzina/docs/audits/2026-10-07-passo-2-leads-externos.md`.
+
+
+## Chave moderna —07/10
+A variável SUPABASE_SERVICE_ROLE_KEY aceita uma secret key moderna sb_secret_... (nome mantido para evitar migração de configuração). O handler envia essa chave somente em apikey, sem apresentá-la como JWT em Authorization. Chaves legadas continuam compatíveis apenas onde ainda estejam habilitadas, como o staging desta rodada. Não reativar legado no projeto atual. O arquivo privado .env.vercel-production.local foi preparado com novo LEAD_SESSION_SECRET; atualizar a chave a partir de .env.local antes de importar/publicar.

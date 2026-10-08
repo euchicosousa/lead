@@ -175,7 +175,9 @@ export default async function handler(req, res) {
 			method: creating ? "POST" : "PATCH",
 			headers: {
 				apikey: key,
-				Authorization: "Bearer " + key,
+				...(key.startsWith("sb_secret_")
+					? {}
+					: { Authorization: "Bearer " + key }),
 				"Content-Type": "application/json",
 				Prefer: "return=representation",
 			},
